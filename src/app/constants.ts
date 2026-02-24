@@ -1,0 +1,11 @@
+export const GOLD = "#C9A84C";
+export const GOLD_LIGHT = "#E2C77A";
+export const GOLD_DIM = "rgba(201,168,76,0.15)";
+export const BG = "#0A0A0A";
+export const SURFACE = "#141414";
+export const SURFACE2 = "#1A1A1A";
+export const SURFACE3 = "#222222";
+export const BORDER = "#282828";
+export const BORDER2 = "#1E1E1E";
+export const FONT_BODY = "'Plus Jakarta Sans', sans-serif";
+export const FONT_DISPLAY = "'Cormorant Garamond', serif";
