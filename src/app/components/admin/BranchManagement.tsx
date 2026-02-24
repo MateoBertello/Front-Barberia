@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, MapPin, Phone, Edit2, Trash2, X, Users, TrendingUp } from "lucide-react";
 import { GOLD, GOLD_LIGHT, GOLD_DIM, SURFACE, SURFACE2, BORDER, BORDER2 } from "../../constants";
 
@@ -12,12 +12,6 @@ interface Branch {
   monthlyRevenue: string;
   image: string;
 }
-
-const initialBranches: Branch[] = [
-  { id: 1, name: "BarberSaaS – Centro", address: "Av. Corrientes 1234, CABA", phone: "+54 11 4000-1111", status: "activa", barbers: 3, monthlyRevenue: "$148.000", image: "https://images.unsplash.com/photo-1759142235060-3191ee596c81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600" },
-  { id: 2, name: "BarberSaaS – Palermo", address: "Thames 882, Palermo, CABA", phone: "+54 11 4000-2222", status: "activa", barbers: 2, monthlyRevenue: "$112.000", image: "https://images.unsplash.com/photo-1769034260387-39fa07f0c0fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600" },
-  { id: 3, name: "BarberSaaS – Belgrano", address: "Cabildo 2100, Belgrano, CABA", phone: "+54 11 4000-3333", status: "inactiva", barbers: 2, monthlyRevenue: "$0", image: "https://images.unsplash.com/photo-1759134198561-e2041049419c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600" },
-];
 
 const emptyForm = { name: "", address: "", phone: "", status: "activa" as "activa" | "inactiva" };
 
@@ -62,10 +56,41 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 export function BranchManagement() {
-  const [branches, setBranches] = useState<Branch[]>(initialBranches);
+  // Empezamos con un array vacío, los datos vendrán de Java
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
+
+  // --- 1. CONEXIÓN CON JAVA: OBTENER SUCURSALES (GET) ---
+  useEffect(() => {
+    const cargarSucursales = async () => {
+      try {
+        const respuesta = await fetch("http://localhost:8080/api/sucursales");
+        if (respuesta.ok) {
+          const datosJava = await respuesta.json();
+          
+          // Traducimos el JSON de Java al formato de Figma
+          const datosReact = datosJava.map((sucursal: any) => ({
+            id: sucursal.id,
+            name: sucursal.nombre,
+            address: sucursal.direccion,
+            status: sucursal.activa ? "activa" : "inactiva",
+            phone: "+54 11 0000-0000", // Relleno visual
+            barbers: 0,               // Relleno visual
+            monthlyRevenue: "$0",     // Relleno visual
+            image: "https://images.unsplash.com/photo-1759142235060-3191ee596c81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600"
+          }));
+          
+          setBranches(datosReact);
+        }
+      } catch (error) {
+        console.error("Error conectando con Java:", error);
+      }
+    };
+
+    cargarSucursales();
+  }, []);
 
   const setField = (field: keyof typeof emptyForm) => (value: string) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -81,23 +106,57 @@ export function BranchManagement() {
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  // --- 2. CONEXIÓN CON JAVA: CREAR SUCURSAL (POST) ---
+  const handleSave = async () => {
     if (!form.name.trim() || !form.address.trim()) return;
+
     if (editingId !== null) {
-      setBranches((prev) =>
-        prev.map((b) => (b.id === editingId ? { ...b, ...form } : b))
-      );
-    } else {
-      setBranches((prev) => [
-        ...prev,
-        { id: Date.now(), ...form, barbers: 0, monthlyRevenue: "$0", image: "https://images.unsplash.com/photo-1766113492854-0f61b7a864da?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600" },
-      ]);
+      setBranches((prev) => prev.map((b) => (b.id === editingId ? { ...b, ...form } : b)));
+      setShowModal(false);
+      return;
     }
+
+    // Preparamos el objeto exacto que tu entidad Sucursal.java espera
+    const sucursalParaJava = {
+      nombre: form.name,
+      direccion: form.address,
+      activa: form.status === "activa"
+    };
+
+    try {
+      const respuesta = await fetch("http://localhost:8080/api/sucursales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sucursalParaJava)
+      });
+
+      if (respuesta.ok) {
+        const sucursalGuardada = await respuesta.json(); // Trae el ID generado por PostgreSQL
+        
+        setBranches((prev) => [
+          ...prev,
+          {
+            id: sucursalGuardada.id,
+            name: sucursalGuardada.nombre,
+            address: sucursalGuardada.direccion,
+            status: sucursalGuardada.activa ? "activa" : "inactiva",
+            phone: form.phone || "+54 11 0000-0000",
+            barbers: 0,
+            monthlyRevenue: "$0",
+            image: "https://images.unsplash.com/photo-1766113492854-0f61b7a864da?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600"
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error al guardar en la base de datos:", error);
+    }
+
     setShowModal(false);
   };
 
   const handleDelete = (id: number) => {
     setBranches((prev) => prev.filter((b) => b.id !== id));
+    // Nota: Aquí luego agregaremos el fetch con método DELETE a Java
   };
 
   const toggleStatus = (id: number) => {
