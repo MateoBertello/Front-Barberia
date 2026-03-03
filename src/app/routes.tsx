@@ -1,5 +1,4 @@
 import { createBrowserRouter } from "react-router";
-import { LoginPage } from "./components/client/LoginPage";
 import { ClientLayout } from "./components/client/ClientLayout";
 import { ClientDashboard } from "./components/client/ClientDashboard";
 import { BookingWizard } from "./components/client/BookingWizard";
@@ -9,6 +8,9 @@ import { BranchManagement } from "./components/admin/BranchManagement";
 import { ServicesManagement } from "./components/admin/ServicesManagement";
 import { StaffManagement } from "./components/admin/StaffManagement";
 import { ScheduleConfig } from "./components/admin/ScheduleConfig";
+import { BarberLayout } from "./components/barber/BarberLayout";
+import { BarberDashboard } from "./components/barber/BarberDashboard";
+import { LoginPage } from "./components/login/LoginPage";
 
 export const router = createBrowserRouter([
   { path: "/", Component: LoginPage },
@@ -29,6 +31,14 @@ export const router = createBrowserRouter([
       { path: "services", Component: ServicesManagement },
       { path: "staff", Component: StaffManagement },
       { path: "schedules", Component: ScheduleConfig },
+    ],
+  },
+  // NUEVA RUTA PARA EL BARBERO
+  {
+    path: "/barber",
+    Component: BarberLayout,
+    children: [
+      { index: true, Component: BarberDashboard },
     ],
   },
 ]);

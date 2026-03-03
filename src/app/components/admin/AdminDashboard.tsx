@@ -23,6 +23,22 @@ export function AdminDashboard() {
     fetchTurnos();
   }, []);
 
+  const cambiarEstadoTurno = async (id: number, nuevoEstado: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/turnos/${id}/estado`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: nuevoEstado })
+      });
+      if (res.ok) {
+        // Actualizamos la pantalla al instante
+        setAppointments(prev => prev.map(t => t.id === id ? { ...t, estado: nuevoEstado } : t));
+      }
+    } catch (error) {
+      console.error("Error al actualizar turno", error);
+    }
+  };
+
   const filtered = appointments.filter((a) => {
     const matchStatus = filter === "todos" || a.estado.toLowerCase() === filter.toLowerCase();
     const matchSearch = search === "" || a.cliente.nombre.toLowerCase().includes(search.toLowerCase());

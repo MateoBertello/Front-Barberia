@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router";
 import {
-  Scissors, LayoutDashboard, Calendar, Users, Star, MapPin, Settings, Menu, X, LogOut, ChevronRight, Bell,
+  Scissors, LayoutDashboard, Calendar, Users, Star, MapPin, Menu, X, LogOut, ChevronRight, Bell,
 } from "lucide-react";
 import { GOLD, GOLD_LIGHT, GOLD_DIM, FONT_BODY, BORDER, BORDER2, SURFACE } from "../../constants";
 
+// 1. Aquí están los items del menú. Horarios apunta directo a /admin/schedules
 const navItems = [
   { icon: LayoutDashboard, label: "Turnos de Hoy", path: "/admin" },
   { icon: MapPin, label: "Sucursales", path: "/admin/branches" },
@@ -79,14 +80,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             </button>
           );
         })}
-        <p className="text-zinc-700 text-xs px-3 py-1.5 uppercase tracking-wider mt-3">Sistema</p>
-        <button
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full text-left transition-all text-sm text-zinc-600 hover:text-zinc-400"
-          style={{ borderLeft: "3px solid transparent" }}
-        >
-          <Settings className="w-4 h-4 flex-shrink-0" />
-          Configuración
-        </button>
+        {/* ELIMINADO: El botón y sección de "Configuración" estaban aquí */}
       </nav>
 
       {/* User */}

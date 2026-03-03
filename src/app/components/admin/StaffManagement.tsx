@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Mail, Phone, Edit2, Trash2, X, Star } from "lucide-react";
+import { Plus, Mail, Phone, X, Star } from "lucide-react";
 import { GOLD, GOLD_LIGHT, GOLD_DIM, SURFACE, SURFACE2, BORDER, BORDER2 } from "../../constants";
 
 interface Barber {
@@ -37,17 +37,17 @@ export function StaffManagement() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
-  // --- GET: OBTENER BARBEROS DESDE JAVA ---
+  // --- GET: LEER BARBEROS ---
   useEffect(() => {
     const cargarBarberos = async () => {
       try {
-        const res = await fetch("http://localhost:8080/api/usuarios"); // Deberíamos filtrar por rol, pero por ahora traemos todos
+        const res = await fetch("http://localhost:8080/api/usuarios");
         if (res.ok) {
           const data = await res.json();
-          const soloBarberos = data.filter((u: any) => u.rol === "BARBERO"); // Filtramos en React temporalmente
+          const soloBarberos = data.filter((u: any) => u.rol === "BARBERO");
           
           setStaff(soloBarberos.map((b: any) => ({
-            id: b.id, name: b.nombre, email: b.email, phone: b.telefono, status: "activo", avatar: `https://i.pravatar.cc/150?u=${b.id}`
+            id: b.id, name: b.nombre, email: b.email, phone: b.telefono, status: b.activo ? "activo" : "inactivo", avatar: `https://i.pravatar.cc/150?u=${b.id}`
           })));
         }
       } catch (error) { console.error("Error cargando barberos", error); }
@@ -57,13 +57,11 @@ export function StaffManagement() {
 
   const setField = (field: keyof typeof emptyForm) => (value: string) => setForm((f) => ({ ...f, [field]: value }));
 
-  // --- POST: CREAR BARBERO EN JAVA ---
+  // --- POST: CREAR BARBERO ---
   const handleSave = async () => {
-    if (!form.name || !form.email) return;
+    if (!form.name || !form.email) { alert("Completa los campos obligatorios"); return; }
 
-    const barberoJava = {
-      nombre: form.name, email: form.email, contrasena: "123456", telefono: form.phone, rol: "BARBERO"
-    };
+    const barberoJava = { nombre: form.name, email: form.email, contrasena: "123456", telefono: form.phone, rol: "BARBERO", activo: form.status === "activo" };
 
     try {
       const res = await fetch("http://localhost:8080/api/usuarios", {
@@ -72,14 +70,32 @@ export function StaffManagement() {
       if (res.ok) {
         const bGuardado = await res.json();
         setStaff((prev) => [...prev, {
-          id: bGuardado.id, name: bGuardado.nombre, email: bGuardado.email, phone: bGuardado.telefono, status: "activo", avatar: `https://i.pravatar.cc/150?u=${bGuardado.id}`
+          id: bGuardado.id, name: bGuardado.nombre, email: bGuardado.email, phone: bGuardado.telefono, status: bGuardado.activo ? "activo" : "inactivo", avatar: `https://i.pravatar.cc/150?u=${bGuardado.id}`
         }]);
+      } else {
+        const error = await res.json(); alert("Error: " + error.error);
       }
     } catch (error) { console.error("Error guardando", error); }
     setShowModal(false);
   };
 
-  const toggleStatus = (id: number) => { setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === "activo" ? "inactivo" : "activo" } : s))); };
+  // --- PUT: ACTUALIZAR ESTADO (BAJA LÓGICA) ---
+  const toggleStatus = async (barbero: any) => {
+    const nuevoEstado = barbero.status === "activo" ? false : true;
+    
+    const usuarioActualizado = {
+      nombre: barbero.name, email: barbero.email, contrasena: "123456", telefono: barbero.phone, rol: "BARBERO", activo: nuevoEstado
+    };
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/usuarios/${barbero.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(usuarioActualizado)
+      });
+      if (res.ok) {
+        setStaff((prev) => prev.map((s) => (s.id === barbero.id ? { ...s, status: nuevoEstado ? "activo" : "inactivo" } : s)));
+      }
+    } catch (error) { console.error("Error al actualizar barbero", error); }
+  };
 
   return (
     <div className="p-4 lg:p-6">
@@ -103,7 +119,7 @@ export function StaffManagement() {
               <div className="flex items-center gap-2 text-zinc-400 text-xs"><Phone className="w-3.5 h-3.5" />{member.phone}</div>
             </div>
             <div className="flex items-center gap-2 pt-4 border-t" style={{ borderColor: BORDER2 }}>
-              <button onClick={() => toggleStatus(member.id)} className="flex-1 py-2 rounded-lg text-xs transition-colors" style={{ background: member.status === "activo" ? "rgba(248,113,113,0.06)" : "rgba(74,222,128,0.06)", color: member.status === "activo" ? "#F87171" : "#4ADE80", border: `1px solid ${member.status === "activo" ? "rgba(248,113,113,0.15)" : "rgba(74,222,128,0.15)"}` }}>
+              <button onClick={() => toggleStatus(member)} className="flex-1 py-2 rounded-lg text-xs transition-colors" style={{ background: member.status === "activo" ? "rgba(248,113,113,0.06)" : "rgba(74,222,128,0.06)", color: member.status === "activo" ? "#F87171" : "#4ADE80", border: `1px solid ${member.status === "activo" ? "rgba(248,113,113,0.15)" : "rgba(74,222,128,0.15)"}` }}>
                 {member.status === "activo" ? "Suspender" : "Activar"}
               </button>
             </div>
