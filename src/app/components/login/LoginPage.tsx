@@ -37,6 +37,7 @@ export function LoginPage() {
           localStorage.setItem('token', data.token);
           localStorage.setItem('rol', data.rol);
           localStorage.setItem('nombre', data.nombre);
+          localStorage.setItem('userId', data.id);
 
           if (data.rol === 'DUEÑO') navigate('/admin');
           else if (data.rol === 'BARBERO') navigate('/barber');

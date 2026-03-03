@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Calendar, Clock, MapPin, Plus, Scissors } from "lucide-react";
-import { GOLD, GOLD_LIGHT, GOLD_DIM, FONT_DISPLAY, SURFACE, SURFACE2, BORDER, BORDER2 } from "../../constants";
+import { Scissors, Plus } from "lucide-react";
+import { apiClient } from "../utils/apsClient"; 
+import { GOLD, FONT_DISPLAY, SURFACE, BORDER2 } from "../../constants";
 
 export function ClientDashboard() {
   const navigate = useNavigate();
@@ -10,18 +11,21 @@ export function ClientDashboard() {
   useEffect(() => {
     const fetchMisTurnos = async () => {
       try {
-        const res = await fetch("http://localhost:8080/api/turnos");
-        if (res.ok) {
-          const data = await res.json();
-          // Filtramos solo los turnos del cliente ID 1
-          const turnosCliente = data.filter((t: any) => t.cliente.id === 1);
-          
-          // Ordenamos para que el más reciente salga arriba
-          turnosCliente.sort((a: any, b: any) => new Date(b.fechaHoraInicio).getTime() - new Date(a.fechaHoraInicio).getTime());
-          setMisTurnos(turnosCliente);
-        }
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+
+        // 🌟 MAGIA: apiClient ya devuelve los datos (array de turnos)
+        // No necesitamos if (res.ok) ni res.json() porque el cliente ya lo hizo.
+        const data = await apiClient<any[]>("/turnos");
+        
+        const turnosCliente = data.filter((t: any) => t.cliente.id === Number(userId));
+        
+        turnosCliente.sort((a: any, b: any) => new Date(b.fechaHoraInicio).getTime() - new Date(a.fechaHoraInicio).getTime());
+        setMisTurnos(turnosCliente);
+        
       } catch (error) {
-        console.error("Error", error);
+        // El error ya fue mostrado por el Toast en apsClient, aquí solo lo logueamos
+        console.error("Error en dashboard:", error);
       }
     };
     fetchMisTurnos();
@@ -55,7 +59,7 @@ export function ClientDashboard() {
       <section>
         <h2 className="text-white text-sm font-medium mb-4 tracking-wide border-l-2 pl-2" style={{ borderColor: GOLD }}>Mi Historial de Cortes</h2>
         <div className="rounded-2xl overflow-hidden" style={{ background: SURFACE, border: `1px solid ${BORDER2}` }}>
-          {misTurnos.map((cut, i) => {
+          {misTurnos.map((cut) => {
             const fecha = new Date(cut.fechaHoraInicio);
             const fechaStr = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 

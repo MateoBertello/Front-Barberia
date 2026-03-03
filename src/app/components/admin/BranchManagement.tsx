@@ -1,184 +1,46 @@
 import React, { useState, useEffect } from "react";
-import { Plus, MapPin, Phone, Edit2, X, Users, TrendingUp } from "lucide-react";
-import { GOLD, GOLD_LIGHT, GOLD_DIM, SURFACE, SURFACE2, BORDER, BORDER2 } from "../../constants";
-
-interface Branch {
-  id: number;
-  name: string;
-  address: string;
-  phone: string;
-  status: "activa" | "inactiva";
-  barbers: number;
-  monthlyRevenue: string;
-  image: string;
-}
-
-const emptyForm = { name: "", address: "", phone: "", status: "activa" as "activa" | "inactiva" };
-
-function Input({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-  return (
-    <div>
-      <label className="block text-zinc-500 text-xs mb-1.5 uppercase tracking-wider">{label}</label>
-      <input
-        type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-700 outline-none transition-colors"
-        style={{ background: SURFACE2, border: `1px solid ${BORDER}` }}
-        onFocus={(e) => (e.target.style.borderColor = GOLD)} onBlur={(e) => (e.target.style.borderColor = BORDER)}
-      />
-    </div>
-  );
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: "#141414", border: `1px solid ${BORDER}` }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${BORDER2}` }}>
-          <h3 className="text-white text-sm font-medium">{title}</h3>
-          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
-}
+import { Plus, MapPin } from "lucide-react";
+import { apiClient } from "../utils/apsClient";
 
 export function BranchManagement() {
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({ name: "", address: "", phone: "" });
 
-  // --- GET: LEER SUCURSALES ---
-  useEffect(() => {
-    const cargarSucursales = async () => {
-      try {
-        const respuesta = await fetch("http://localhost:8080/api/sucursales");
-        if (respuesta.ok) {
-          const datosJava = await respuesta.json();
-          const datosReact = datosJava.map((sucursal: any) => ({
-            id: sucursal.id,
-            name: sucursal.nombre,
-            address: sucursal.direccion,
-            status: sucursal.activa ? "activa" : "inactiva",
-            phone: sucursal.telefono || "+54 11 0000-0000",
-            barbers: 0,
-            monthlyRevenue: "$0",
-            image: "https://images.unsplash.com/photo-1759142235060-3191ee596c81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600"
-          }));
-          setBranches(datosReact);
-        }
-      } catch (error) { console.error("Error conectando con Java:", error); }
-    };
-    cargarSucursales();
-  }, []);
+  const load = () => apiClient<any[]>("/sucursales").then(setBranches).catch(console.error);
+  useEffect(() => { load(); }, []);
 
-  const setField = (field: keyof typeof emptyForm) => (value: string) => setForm((f) => ({ ...f, [field]: value }));
-
-  const openCreate = () => { setEditingId(null); setForm(emptyForm); setShowModal(true); };
-  const openEdit = (b: Branch) => { setEditingId(b.id); setForm({ name: b.name, address: b.address, phone: b.phone, status: b.status }); setShowModal(true); };
-
-  // --- POST: CREAR SUCURSAL ---
   const handleSave = async () => {
-    if (!form.name.trim() || !form.address.trim()) { alert("Completa los campos obligatorios"); return; }
-    if (editingId !== null) { setBranches((prev) => prev.map((b) => (b.id === editingId ? { ...b, ...form } : b))); setShowModal(false); return; }
-
-    const sucursalParaJava = { nombre: form.name, direccion: form.address, telefono: form.phone, activa: form.status === "activa" };
-
     try {
-      const respuesta = await fetch("http://localhost:8080/api/sucursales", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sucursalParaJava)
+      await apiClient("/sucursales", {
+        method: "POST",
+        body: JSON.stringify({ nombre: form.name, direccion: form.address, telefono: form.phone, estado: "ACTIVA" }),
+        successMessage: "Sucursal creada"
       });
-      if (respuesta.ok) {
-        const guardada = await respuesta.json();
-        setBranches((prev) => [...prev, {
-          id: guardada.id, name: guardada.nombre, address: guardada.direccion, status: guardada.activa ? "activa" : "inactiva", phone: guardada.telefono || form.phone, barbers: 0, monthlyRevenue: "$0", image: "https://images.unsplash.com/photo-1766113492854-0f61b7a864da?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600"
-        }]);
-      } else {
-        const error = await respuesta.json(); alert("Error: " + error.error);
-      }
-    } catch (error) { console.error("Error de red:", error); }
-    setShowModal(false);
-  };
-
-  // --- PUT: ACTUALIZAR ESTADO (BAJA LÓGICA) ---
-  const toggleStatus = async (sucursal: any) => {
-    const nuevoEstadoBooleano = sucursal.status === "activa" ? false : true;
-    const sucursalActualizada = { nombre: sucursal.name, direccion: sucursal.address, telefono: sucursal.phone, activa: nuevoEstadoBooleano };
-
-    try {
-      const res = await fetch(`http://localhost:8080/api/sucursales/${sucursal.id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sucursalActualizada)
-      });
-      if (res.ok) {
-        setBranches((prev) => prev.map((b) => (b.id === sucursal.id ? { ...b, status: nuevoEstadoBooleano ? "activa" : "inactiva" } : b)));
-      }
-    } catch (error) { console.error("Error al actualizar sucursal", error); }
+      setShowModal(false); setForm({ name: "", address: "", phone: "" }); load();
+    } catch (e) { console.error(e); }
   };
 
   return (
-    <div className="p-4 lg:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div><p className="text-zinc-500 text-sm">Gestioná tus sedes activas</p></div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #A8832A 100%)`, color: "#0A0A0A" }}>
-          <Plus className="w-4 h-4" /> Nueva Sucursal
-        </button>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {branches.map((b) => (
-          <div key={b.id} className="rounded-2xl overflow-hidden flex flex-col" style={{ background: SURFACE, border: `1px solid ${BORDER2}` }}>
-            <div className="relative h-40 overflow-hidden">
-              <img src={b.image} alt={b.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0.2) 60%)" }} />
-              <div className="absolute bottom-0 left-0 right-0 p-4"><div className="text-white font-medium text-sm">{b.name}</div></div>
-              <div className="absolute top-3 right-3">
-                <span className="px-2.5 py-1 rounded-full text-xs" style={b.status === "activa" ? { background: "rgba(74,222,128,0.15)", color: "#4ADE80", border: "1px solid rgba(74,222,128,0.25)" } : { background: "rgba(248,113,113,0.12)", color: "#F87171", border: "1px solid rgba(248,113,113,0.2)" }}>
-                  {b.status === "activa" ? "● Activa" : "● Inactiva"}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex-1 p-4">
-              <div className="flex items-start gap-2 mb-1.5"><MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: GOLD }} /><span className="text-zinc-400 text-xs">{b.address}</span></div>
-              <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: GOLD }} /><span className="text-zinc-400 text-xs">{b.phone}</span></div>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                <div className="rounded-lg p-2.5" style={{ background: "#111", border: `1px solid ${BORDER}` }}>
-                  <div className="flex items-center gap-1.5 mb-0.5"><Users className="w-3 h-3" style={{ color: GOLD }} /><span className="text-zinc-600 text-xs">Barberos</span></div>
-                  <div className="text-white text-sm font-medium">{b.barbers}</div>
-                </div>
-                <div className="rounded-lg p-2.5" style={{ background: "#111", border: `1px solid ${BORDER}` }}>
-                  <div className="flex items-center gap-1.5 mb-0.5"><TrendingUp className="w-3 h-3" style={{ color: GOLD }} /><span className="text-zinc-600 text-xs">Mes</span></div>
-                  <div className="text-white text-sm font-medium">{b.monthlyRevenue}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-4 pb-4 flex items-center gap-2">
-              <button onClick={() => toggleStatus(b)} className="flex-1 py-2 rounded-lg text-xs transition-all" style={{ background: b.status === "activa" ? "rgba(248,113,113,0.06)" : "rgba(74,222,128,0.06)", color: b.status === "activa" ? "#F87171" : "#4ADE80", border: `1px solid ${b.status === "activa" ? "rgba(248,113,113,0.15)" : "rgba(74,222,128,0.15)"}` }}>
-                {b.status === "activa" ? "Desactivar" : "Activar"}
-              </button>
-              <button onClick={() => openEdit(b)} className="w-9 h-9 rounded-lg flex items-center justify-center transition-all" style={{ background: SURFACE2, border: `1px solid ${BORDER}` }}>
-                <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
-              </button>
-            </div>
+    <div className="p-8 max-w-5xl mx-auto">
+      <div className="flex justify-between mb-8"><h1 className="text-white text-2xl font-bold">Sucursales</h1><button onClick={() => setShowModal(true)} className="flex gap-2 px-4 py-2 rounded bg-yellow-600 text-black font-medium"><Plus className="w-4 h-4" /> Nueva</button></div>
+      <div className="grid gap-4">
+        {branches.map(b => (
+          <div key={b.id} className="p-5 rounded-xl bg-zinc-900 border border-zinc-800 flex justify-between items-center">
+             <div><h3 className="text-white font-medium">{b.nombre}</h3><div className="text-zinc-500 text-sm flex gap-1 items-center"><MapPin className="w-3 h-3"/> {b.direccion}</div></div>
+             <span className="text-xs px-2 py-1 rounded bg-green-900/30 text-green-400">Activa</span>
           </div>
         ))}
       </div>
-
-      {showModal && (
-        <Modal title={editingId ? "Editar Sucursal" : "Nueva Sucursal"} onClose={() => setShowModal(false)}>
-          <div className="flex flex-col gap-4">
-            <Input label="Nombre de la sucursal" value={form.name} onChange={setField("name")} placeholder="Ej. BarberSaaS – Microcentro" />
-            <Input label="Dirección" value={form.address} onChange={setField("address")} placeholder="Ej. Florida 500, CABA" />
-            <Input label="Teléfono" value={form.phone} onChange={setField("phone")} placeholder="+54 11 0000-0000" type="tel" />
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl text-sm" style={{ background: SURFACE2, border: `1px solid ${BORDER}`, color: "#888" }}>Cancelar</button>
-              <button onClick={handleSave} className="flex-1 py-2.5 rounded-xl text-sm font-medium" style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #A8832A 100%)`, color: "#0A0A0A" }}>{editingId ? "Guardar cambios" : "Crear sucursal"}</button>
-            </div>
+      {showModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"><div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-xl p-6">
+          <div className="flex justify-between mb-4"><h3 className="text-white font-bold">Nueva Sucursal</h3><button onClick={() => setShowModal(false)} className="text-zinc-500">✕</button></div>
+          <div className="space-y-3">
+             <input value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="Nombre" className="w-full p-2 rounded bg-zinc-900 border border-zinc-800 text-white"/>
+             <input value={form.address} onChange={e=>setForm({...form, address: e.target.value})} placeholder="Dirección" className="w-full p-2 rounded bg-zinc-900 border border-zinc-800 text-white"/>
+             <input value={form.phone} onChange={e=>setForm({...form, phone: e.target.value})} placeholder="Teléfono" className="w-full p-2 rounded bg-zinc-900 border border-zinc-800 text-white"/>
+             <button onClick={handleSave} className="w-full py-2 bg-yellow-600 text-black font-bold rounded">Guardar</button>
           </div>
-        </Modal>
-      )}
+      </div></div>}
     </div>
   );
 }

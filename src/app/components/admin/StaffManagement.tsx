@@ -1,145 +1,63 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Mail, Phone, X, Star } from "lucide-react";
-import { GOLD, GOLD_LIGHT, GOLD_DIM, SURFACE, SURFACE2, BORDER, BORDER2 } from "../../constants";
+import { Plus, Mail, Trash2 } from "lucide-react";
+import { apiClient } from "../utils/apsClient";
+import { GOLD, SURFACE, SURFACE2, BORDER } from "../../constants";
 
-interface Barber {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  status: "activo" | "inactivo";
-  avatar: string;
-}
+// Componentes UI simples internos
+const Input = ({ label, value, onChange, placeholder, type = "text" }: any) => (
+  <div className="mb-3">
+    <label className="block text-zinc-500 text-xs mb-1 uppercase">{label}</label>
+    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded bg-zinc-900 border border-zinc-800 p-2 text-white outline-none focus:border-yellow-500"/>
+  </div>
+);
 
-const emptyForm = { name: "", email: "", phone: "", status: "activo" as "activo" | "inactivo" };
-
-function Input({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-  return (
-    <div>
-      <label className="block text-zinc-500 text-xs mb-1.5 uppercase tracking-wider">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-700 outline-none transition-colors" style={{ background: SURFACE2, border: `1px solid ${BORDER}` }} onFocus={(e) => (e.target.style.borderColor = GOLD)} onBlur={(e) => (e.target.style.borderColor = BORDER)} />
-    </div>
-  );
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: "#141414", border: `1px solid ${BORDER}` }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${BORDER2}` }}><h3 className="text-white text-sm font-medium">{title}</h3><button onClick={onClose} className="text-zinc-600 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button></div><div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
-}
+const Modal = ({ title, onClose, children }: any) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"><div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-xl p-6"><div className="flex justify-between mb-4"><h3 className="text-white font-bold">{title}</h3><button onClick={onClose} className="text-zinc-500">✕</button></div>{children}</div></div>
+);
 
 export function StaffManagement() {
-  const [staff, setStaff] = useState<Barber[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
 
-  // --- GET: LEER BARBEROS ---
-  useEffect(() => {
-    const cargarBarberos = async () => {
-      try {
-        const res = await fetch("http://localhost:8080/api/usuarios");
-        if (res.ok) {
-          const data = await res.json();
-          const soloBarberos = data.filter((u: any) => u.rol === "BARBERO");
-          
-          setStaff(soloBarberos.map((b: any) => ({
-            id: b.id, name: b.nombre, email: b.email, phone: b.telefono, status: b.activo ? "activo" : "inactivo", avatar: `https://i.pravatar.cc/150?u=${b.id}`
-          })));
-        }
-      } catch (error) { console.error("Error cargando barberos", error); }
-    };
-    cargarBarberos();
-  }, []);
+  const loadStaff = () => apiClient<any[]>("/usuarios").then(users => setStaff(users.filter(u => u.rol === "BARBERO"))).catch(console.error);
+  useEffect(() => { loadStaff(); }, []);
 
-  const setField = (field: keyof typeof emptyForm) => (value: string) => setForm((f) => ({ ...f, [field]: value }));
-
-  // --- POST: CREAR BARBERO ---
   const handleSave = async () => {
-    if (!form.name || !form.email) { alert("Completa los campos obligatorios"); return; }
-
-    const barberoJava = { nombre: form.name, email: form.email, contrasena: "123456", telefono: form.phone, rol: "BARBERO", activo: form.status === "activo" };
-
     try {
-      const res = await fetch("http://localhost:8080/api/usuarios", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(barberoJava)
+      await apiClient("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ nombre: form.name, email: form.email, contrasena: form.password, telefono: form.phone, rol: "BARBERO" }),
+        successMessage: "Barbero creado"
       });
-      if (res.ok) {
-        const bGuardado = await res.json();
-        setStaff((prev) => [...prev, {
-          id: bGuardado.id, name: bGuardado.nombre, email: bGuardado.email, phone: bGuardado.telefono, status: bGuardado.activo ? "activo" : "inactivo", avatar: `https://i.pravatar.cc/150?u=${bGuardado.id}`
-        }]);
-      } else {
-        const error = await res.json(); alert("Error: " + error.error);
-      }
-    } catch (error) { console.error("Error guardando", error); }
-    setShowModal(false);
+      setShowModal(false); setForm({ name: "", email: "", phone: "", password: "" }); loadStaff();
+    } catch (e) { console.error(e); }
   };
 
-  // --- PUT: ACTUALIZAR ESTADO (BAJA LÓGICA) ---
-  const toggleStatus = async (barbero: any) => {
-    const nuevoEstado = barbero.status === "activo" ? false : true;
-    
-    const usuarioActualizado = {
-      nombre: barbero.name, email: barbero.email, contrasena: "123456", telefono: barbero.phone, rol: "BARBERO", activo: nuevoEstado
-    };
-
-    try {
-      const res = await fetch(`http://localhost:8080/api/usuarios/${barbero.id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(usuarioActualizado)
-      });
-      if (res.ok) {
-        setStaff((prev) => prev.map((s) => (s.id === barbero.id ? { ...s, status: nuevoEstado ? "activo" : "inactivo" } : s)));
-      }
-    } catch (error) { console.error("Error al actualizar barbero", error); }
+  const handleDelete = async (id: number) => {
+    if(!confirm("¿Eliminar?")) return;
+    try { await apiClient(`/usuarios/${id}`, { method: "DELETE", successMessage: "Eliminado" }); setStaff(s => s.filter(b => b.id !== id)); } catch(e) { console.error(e); }
   };
 
   return (
-    <div className="p-4 lg:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div><p className="text-zinc-500 text-sm">Gestioná tu equipo de barberos</p></div>
-        <button onClick={() => { setForm(emptyForm); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #A8832A 100%)`, color: "#0A0A0A" }}><Plus className="w-4 h-4" /> Nuevo Barbero</button>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {staff.map((member) => (
-          <div key={member.id} className="rounded-2xl p-5" style={{ background: SURFACE, border: `1px solid ${BORDER2}` }}>
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-14 h-14 rounded-full overflow-hidden" style={{ border: `2px solid ${BORDER}` }}><img src={member.avatar} alt={member.name} className="w-full h-full object-cover" /></div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1"><h3 className="text-white font-medium text-sm truncate">{member.name}</h3></div>
-                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider mb-2" style={{ background: GOLD_DIM, color: GOLD_LIGHT, border: `1px solid ${BORDER}` }}>Barbero</span>
-              </div>
-            </div>
-            <div className="space-y-2 mb-5">
-              <div className="flex items-center gap-2 text-zinc-400 text-xs"><Mail className="w-3.5 h-3.5" />{member.email}</div>
-              <div className="flex items-center gap-2 text-zinc-400 text-xs"><Phone className="w-3.5 h-3.5" />{member.phone}</div>
-            </div>
-            <div className="flex items-center gap-2 pt-4 border-t" style={{ borderColor: BORDER2 }}>
-              <button onClick={() => toggleStatus(member)} className="flex-1 py-2 rounded-lg text-xs transition-colors" style={{ background: member.status === "activo" ? "rgba(248,113,113,0.06)" : "rgba(74,222,128,0.06)", color: member.status === "activo" ? "#F87171" : "#4ADE80", border: `1px solid ${member.status === "activo" ? "rgba(248,113,113,0.15)" : "rgba(74,222,128,0.15)"}` }}>
-                {member.status === "activo" ? "Suspender" : "Activar"}
-              </button>
-            </div>
+    <div className="p-8 max-w-5xl mx-auto">
+      <div className="flex justify-between mb-8"><h1 className="text-white text-2xl font-bold">Staff</h1><button onClick={() => setShowModal(true)} className="flex gap-2 px-4 py-2 rounded bg-yellow-600 text-black font-medium"><Plus className="w-4 h-4" /> Nuevo</button></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {staff.map(m => (
+          <div key={m.id} className="p-5 rounded-xl bg-zinc-900 border border-zinc-800">
+            <h3 className="text-white font-medium">{m.nombre}</h3>
+            <div className="text-zinc-500 text-xs mt-1 flex gap-1"><Mail className="w-3 h-3"/> {m.email}</div>
+            <button onClick={() => handleDelete(m.id)} className="mt-4 w-full py-2 rounded border border-red-900/30 text-red-400 hover:bg-red-900/10 text-xs">Eliminar</button>
           </div>
         ))}
       </div>
-
-      {showModal && (
-        <Modal title="Nuevo Miembro del Staff" onClose={() => setShowModal(false)}>
-          <div className="flex flex-col gap-4">
-            <Input label="Nombre completo" value={form.name} onChange={setField("name")} placeholder="Ej. Martín López" />
-            <Input label="Email" value={form.email} onChange={setField("email")} placeholder="martin@barbersaas.com" type="email" />
-            <Input label="Teléfono" value={form.phone} onChange={setField("phone")} placeholder="+54 11 0000-0000" type="tel" />
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl text-sm" style={{ background: SURFACE2, color: "#888" }}>Cancelar</button>
-              <button onClick={handleSave} className="flex-1 py-2.5 rounded-xl text-sm font-medium" style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #A8832A 100%)`, color: "#0A0A0A" }}>Registrar barbero</button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {showModal && <Modal title="Nuevo Barbero" onClose={() => setShowModal(false)}>
+        <Input label="Nombre" value={form.name} onChange={(v:string) => setForm({...form, name: v})} />
+        <Input label="Email" value={form.email} onChange={(v:string) => setForm({...form, email: v})} />
+        <Input label="Contraseña" value={form.password} onChange={(v:string) => setForm({...form, password: v})} type="password" />
+        <Input label="Teléfono" value={form.phone} onChange={(v:string) => setForm({...form, phone: v})} />
+        <button onClick={handleSave} className="w-full py-2 bg-yellow-600 text-black font-bold rounded mt-2">Guardar</button>
+      </Modal>}
     </div>
   );
 }

@@ -1,15 +1,16 @@
+/// <reference types="vite/client" />
 import { toast } from 'sonner';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+// Si VITE_API_URL no está definido, usa localhost por defecto
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
 
 interface FetchOptions extends RequestInit {
   successMessage?: string;
 }
 
-export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+// Renombramos apiFetch a apiClient para que coincida con tus componentes
+export async function apiClient<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { successMessage, ...customOptions } = options;
-
-  // Recuperamos el token si el usuario ya inició sesión
   const token = localStorage.getItem('token');
 
   try {
@@ -22,30 +23,33 @@ export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}):
       },
     });
 
+    // Manejo de Errores Global
     if (!response.ok) {
-      // Si el backend devuelve 401 (No autorizado) o 403, puedes redirigir al login
       if (response.status === 401) {
-         localStorage.removeItem('token');
-         window.location.href = '/login';
+         localStorage.clear(); // Borramos todo (token, rol, userId)
+         window.location.href = '/'; // Redirigimos
+         throw new Error("Sesión expirada");
       }
 
       const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.error || 'Ocurrió un error en la operación.';
-
+      const errorMessage = errorData?.error || 'Error en la operación.';
+      
       toast.error(errorMessage);
       throw new Error(errorMessage);
     }
 
+    // Si es un 204 (No Content), devolvemos vacío
     if (response.status === 204) {
       if (successMessage) toast.success(successMessage);
       return {} as T;
     }
 
+    // Parseamos el JSON aquí, para no hacerlo en cada componente
     const data = await response.json();
 
     if (successMessage) toast.success(successMessage);
-
     return data;
+
   } catch (error) {
     if (error instanceof TypeError) {
       toast.error('No se pudo conectar con el servidor.');

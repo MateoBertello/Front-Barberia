@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, Clock, CheckCircle, XCircle } from "lucide-react";
-import { GOLD, GOLD_LIGHT, SURFACE, BORDER, BORDER2 } from "../../constants";
+import { CheckCircle, XCircle } from "lucide-react";
+import { apiClient } from "../utils/apsClient"; 
+import { GOLD, GOLD_LIGHT, SURFACE, BORDER2 } from "../../constants";
 
 export function BarberDashboard() {
   const [misTurnos, setMisTurnos] = useState<any[]>([]);
   
-  // ID DEL BARBERO HARDCODEADO (Hasta que pongamos JWT)
-  const MI_ID_BARBERO = 2; // ¡Cambia este número si tu barbero en Supabase tiene otro ID!
-
   useEffect(() => {
     const fetchTurnos = async () => {
       try {
-        const res = await fetch("http://localhost:8080/api/turnos");
-        if (res.ok) {
-          const data = await res.json();
-          // Filtramos solo los turnos donde yo soy el barbero asignado
-          const soloMisTurnos = data.filter((t: any) => t.barbero.id === MI_ID_BARBERO);
-          // Ordenamos por fecha
-          soloMisTurnos.sort((a: any, b: any) => new Date(a.fechaHoraInicio).getTime() - new Date(b.fechaHoraInicio).getTime());
-          setMisTurnos(soloMisTurnos);
-        }
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+
+        // apiClient ya devuelve los datos parseados
+        const data = await apiClient<any[]>("/turnos");
+        
+        const soloMisTurnos = data.filter((t: any) => t.barbero.id === Number(userId));
+        
+        soloMisTurnos.sort((a: any, b: any) => new Date(a.fechaHoraInicio).getTime() - new Date(b.fechaHoraInicio).getTime());
+        setMisTurnos(soloMisTurnos);
+
       } catch (error) {
         console.error("Error al cargar turnos", error);
       }
@@ -27,16 +27,22 @@ export function BarberDashboard() {
     fetchTurnos();
   }, []);
 
-  // --- ACTUALIZAR ESTADO DEL TURNO ---
   const cambiarEstadoTurno = async (id: number, nuevoEstado: string) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/turnos/${id}/estado`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: nuevoEstado })
+      // Usamos successMessage para que el cliente muestre el Toast verde automáticamente
+      await apiClient(`/turnos/${id}/estado`, {
+        method: "PUT", 
+        body: JSON.stringify({ estado: nuevoEstado }),
+        successMessage: `Turno ${nuevoEstado.toLowerCase()} correctamente`
       });
-      if (res.ok) {
-        setMisTurnos(prev => prev.map(t => t.id === id ? { ...t, estado: nuevoEstado } : t));
-      }
-    } catch (error) { console.error("Error", error); }
+
+      // Si no hubo error (apiClient lanza error si falla), actualizamos el estado local
+      setMisTurnos(prev => prev.map(t => t.id === id ? { ...t, estado: nuevoEstado } : t));
+      
+    } catch (error) { 
+       // El error ya se mostró en un toast rojo
+       console.error("Error actualizando turno", error); 
+    }
   };
 
   const turnosPendientes = misTurnos.filter(t => t.estado === "PENDIENTE").length;
